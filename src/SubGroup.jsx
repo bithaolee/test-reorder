@@ -1,4 +1,23 @@
+import { useCallback } from "react";
 import { useFormContext, useFieldArray } from "react-hook-form";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from "@dnd-kit/modifiers";
+
 import { Product } from "./Product";
 import { IconDraggable } from "./IconDraggable";
 
@@ -11,6 +30,25 @@ export const SubGroup = ({ index, onMove, disableUp, disableDown }) => {
   });
 
   const groupName = watch(`subGroups[${index}].name`);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = useCallback(
+    async (event) => {
+      const { active, over } = event;
+      if (active.id !== over.id) {
+        const oldIndex = fields.findIndex((item) => item.id === active.id);
+        const newIndex = fields.findIndex((item) => item.id === over.id);
+        move(oldIndex, newIndex);
+      }
+    },
+    [fields, move]
+  );
 
   return (
     <div className="sub-group-container">
@@ -39,21 +77,34 @@ export const SubGroup = ({ index, onMove, disableUp, disableDown }) => {
         </div>
       </div>
       <div>
-        {fields.map((field, _index) => (
-          <Product
-            key={field.id}
-            groupIndex={index}
-            index={_index}
-            onRemove={() => {
-              remove(_index);
-            }}
-            onMove={(oldIndex, newIndex) => {
-              move(_index, newIndex);
-            }}
-            disableUp={_index === 0}
-            disableDown={_index === fields.length - 1}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        >
+          <SortableContext
+            items={fields}
+            strategy={verticalListSortingStrategy}
+          >
+            {fields.map((field, _index) => (
+              <Product
+                key={field.id}
+                groupIndex={index}
+                index={_index}
+                id={field.id}
+                onRemove={() => {
+                  remove(_index);
+                }}
+                onMove={(oldIndex, newIndex) => {
+                  move(_index, newIndex);
+                }}
+                disableUp={_index === 0}
+                disableDown={_index === fields.length - 1}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
       <div className="btn-add-container">
         <button
